@@ -19,23 +19,20 @@ async def _run(cmd: str) -> str:
     return stdout.decode().strip()
 
 
-async def _docker_exec(command: str, server_ip: str = SERVER_IP) -> str:
-    return await _run(
-        f"ssh -o StrictHostKeyChecking=no root@{server_ip} "
-        f"docker exec {CONTAINER_NAME} {command}"
-    )
+async def _docker_exec(command: str) -> str:
+    return await _run(f"docker exec {CONTAINER_NAME} {command}")
 
 
-async def get_server_config(server_ip: str = SERVER_IP) -> str:
-    return await _docker_exec(f"cat /opt/amnezia/awg/{WG_INTERFACE}.conf", server_ip)
+async def get_server_config() -> str:
+    return await _docker_exec(f"cat /opt/amnezia/awg/{WG_INTERFACE}.conf")
 
 
-async def get_psk(server_ip: str = SERVER_IP) -> str:
-    return await _docker_exec("cat /opt/amnezia/awg/wireguard_psk.key", server_ip)
+async def get_psk() -> str:
+    return await _docker_exec("cat /opt/amnezia/awg/wireguard_psk.key")
 
 
-async def get_server_public_key_file(server_ip: str = SERVER_IP) -> str:
-    return await _docker_exec("cat /opt/amnezia/awg/wireguard_server_public_key.key", server_ip)
+async def get_server_public_key_file() -> str:
+    return await _docker_exec("cat /opt/amnezia/awg/wireguard_server_public_key.key")
 
 
 def parse_server_info(config_text: str) -> dict:
@@ -77,11 +74,10 @@ def allocate_ip(config_text: str) -> str:
     raise RuntimeError("No free IPs available in subnet")
 
 
-async def generate_keypair(server_ip: str = SERVER_IP) -> Tuple[str, str]:
-    private_key = await _docker_exec("awg genkey", server_ip)
+async def generate_keypair() -> Tuple[str, str]:
+    private_key = await _docker_exec("awg genkey")
     proc = await asyncio.create_subprocess_shell(
-        f"echo '{private_key}' | ssh -o StrictHostKeyChecking=no root@{server_ip} "
-        f"docker exec -i {CONTAINER_NAME} awg pubkey",
+        f"echo '{private_key}' | docker exec -i {CONTAINER_NAME} awg pubkey",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -90,10 +86,9 @@ async def generate_keypair(server_ip: str = SERVER_IP) -> Tuple[str, str]:
     return private_key, public_key
 
 
-async def get_server_public_key(server_private_key: str, server_ip: str = SERVER_IP) -> str:
+async def get_server_public_key(server_private_key: str) -> str:
     proc = await asyncio.create_subprocess_shell(
-        f"echo '{server_private_key}' | ssh -o StrictHostKeyChecking=no root@{server_ip} "
-        f"docker exec -i {CONTAINER_NAME} awg pubkey",
+        f"echo '{server_private_key}' | docker exec -i {CONTAINER_NAME} awg pubkey",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -101,7 +96,7 @@ async def get_server_public_key(server_private_key: str, server_ip: str = SERVER
     return stdout.decode().strip()
 
 
-async def add_peer(public_key: str, client_ip: str, psk: str, server_ip: str = SERVER_IP):
+async def add_peer(public_key: str, client_ip: str, psk: str):
     config_path = f"/opt/amnezia/awg/{WG_INTERFACE}.conf"
     peer_block = (
         f"\\n[Peer]\\n"
@@ -109,13 +104,13 @@ async def add_peer(public_key: str, client_ip: str, psk: str, server_ip: str = S
         f"PresharedKey = {psk}\\n"
         f"AllowedIPs = {client_ip}/32\\n"
     )
-    await _docker_exec(f"bash -c 'printf \"{peer_block}\" >> {config_path}'", server_ip)
-    await _docker_exec(f"bash -c 'awg syncconf {WG_INTERFACE} <(awg-quick strip /opt/amnezia/awg/{WG_INTERFACE}.conf)'", server_ip)
+    await _docker_exec(f"bash -c 'printf \"{peer_block}\" >> {config_path}'")
+    await _docker_exec(f"bash -c 'awg syncconf {WG_INTERFACE} <(awg-quick strip /opt/amnezia/awg/{WG_INTERFACE}.conf)'")
 
 
-async def remove_peer(public_key: str, server_ip: str = SERVER_IP):
+async def remove_peer(public_key: str):
     config_path = f"/opt/amnezia/awg/{WG_INTERFACE}.conf"
-    config_text = await _docker_exec(f"cat {config_path}", server_ip)
+    config_text = await _docker_exec(f"cat {config_path}")
 
     lines = config_text.split("\n")
     new_lines = []
@@ -139,8 +134,8 @@ async def remove_peer(public_key: str, server_ip: str = SERVER_IP):
 
     new_config = "\n".join(new_lines)
     escaped = new_config.replace("'", "'\\''")
-    await _docker_exec(f"bash -c 'echo '\"'\"'{escaped}'\"'\"' > {config_path}'", server_ip)
-    await _docker_exec(f"bash -c 'awg syncconf {WG_INTERFACE} <(awg-quick strip /opt/amnezia/awg/{WG_INTERFACE}.conf)'", server_ip)
+    await _docker_exec(f"bash -c 'echo '\"'\"'{escaped}'\"'\"' > {config_path}'")
+    await _docker_exec(f"bash -c 'awg syncconf {WG_INTERFACE} <(awg-quick strip /opt/amnezia/awg/{WG_INTERFACE}.conf)'")
 
 
 def build_vpn_url(

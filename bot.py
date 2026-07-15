@@ -76,12 +76,8 @@ async def issue_key(message: Message, user: dict):
     try:
         vpn_url, client_ip, private_key, public_key = await amnezia.create_client(user["name"])
         await database.mark_issued(user["name"], client_ip, private_key, public_key)
-        await message.answer(
-            "Ваш VPN-ключ готов!\n\n"
-            "Скопируйте и вставьте в приложение AmneziaVPN:\n\n"
-            "<code>{}</code>".format(vpn_url),
-            parse_mode="HTML",
-        )
+        await message.answer("Ваш VPN-ключ готов! Скопируйте и вставьте в приложение AmneziaVPN:")
+        await message.answer(vpn_url)
         logger.info("Key issued to %s (tg:%s)", user["name"], message.from_user.id)
     except Exception as e:
         logger.exception("Failed to create client for %s", user["name"])
@@ -285,10 +281,8 @@ async def admin_mykey(callback: CallbackQuery):
     try:
         vpn_url, client_ip, private_key, public_key = await amnezia.create_client(username)
         await database.mark_issued(username, client_ip, private_key, public_key)
-        await callback.message.answer(
-            "Ваш VPN-ключ:\n\n<code>{}</code>".format(vpn_url),
-            parse_mode="HTML",
-        )
+        await callback.message.answer("Ваш VPN-ключ готов!")
+        await callback.message.answer(vpn_url)
         await callback.message.answer("Панель администратора", reply_markup=admin_keyboard())
     except Exception as e:
         logger.exception("Failed to create admin key")
